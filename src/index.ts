@@ -80,7 +80,6 @@ client.once("ready", () => {
 });
 
 client.on("interactionCreate", async (interaction: Interaction) => {
-  if (!interaction.isChatInputCommand()) return;
   await routeInteraction(interaction);
 });
 

@@ -61,8 +61,6 @@ client.once("ready", () => {
         .catch((e) => log.error({ err: e }, "Failed to register slash commands"));
 });
 client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isChatInputCommand())
-        return;
     await routeInteraction(interaction);
 });
 await client.login(token);

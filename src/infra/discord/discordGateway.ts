@@ -4,6 +4,7 @@ import {
   Guild,
   GuildBasedChannel,
   type OverwriteResolvable,
+  type TextChannel,
   Role,
 } from "discord.js";
 import { AppError } from "../../shared/errors/appError.js";
@@ -243,6 +244,53 @@ export class DiscordGateway {
     // MVP: replace
     await (ch as any).permissionOverwrites.set(params.overwrites, params.ctx.reason ?? `requestId=${params.ctx.requestId}`);
     return { changed: true };
+  }
+
+  async ensureMessage(params: {
+    guildId: string;
+    channelId: string;
+    messageKey: string;
+    content: string;
+    existingMessageId?: string;
+    ctx: RequestContext;
+  }): Promise<{ messageId: string; changed: boolean }> {
+    const g = await this.fetchGuild(params.guildId);
+    const ch = await g.channels.fetch(params.channelId).catch(() => null);
+    if (!ch || ch.type !== DjsChannelType.GuildText) {
+      throw new AppError({ code: "NOT_FOUND", message: `Text channel not found: ${params.channelId}` });
+    }
+
+    const channel = ch as TextChannel;
+    const marker = `〔${params.messageKey}〕`;
+    const desired = params.content.includes(marker) ? params.content : `${params.content}\n\n${marker}`;
+
+    let msg = params.existingMessageId
+      ? await channel.messages.fetch(params.existingMessageId).catch(() => null)
+      : null;
+
+    if (!msg) {
+      // Adoption: ищем маркер среди последних сообщений
+      const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+      if (recent) {
+        const matches = [...recent.values()].filter((m) => (m.content ?? "").includes(marker));
+        if (matches.length === 1) msg = matches[0]!;
+        if (matches.length > 1) {
+          throw new AppError({
+            code: "CONFLICT",
+            message: `Multiple messages match key ${params.messageKey} in channel ${params.channelId}`,
+          });
+        }
+      }
+    }
+
+    if (!msg) {
+      const created = await channel.send({ content: desired });
+      return { messageId: created.id, changed: true };
+    }
+
+    if (msg.content === desired) return { messageId: msg.id, changed: false };
+    const edited = await msg.edit({ content: desired });
+    return { messageId: edited.id, changed: true };
   }
 
   private async fetchGuild(guildId: string): Promise<Guild> {

@@ -68,6 +68,7 @@
     "POLICY_INTAKE_PUBLIC": {
       "rules": [
         { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "SYS_BOT_ADMIN" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_GUEST" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
@@ -76,6 +77,7 @@
     "POLICY_INTAKE_QUEUE_STAFF_ONLY": {
       "rules": [
         { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "SYS_BOT_ADMIN" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
       ]
@@ -83,6 +85,7 @@
     "POLICY_MEMBER": {
       "rules": [
         { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "SYS_BOT_ADMIN" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_MEMBER" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
@@ -91,6 +94,7 @@
     "POLICY_HQ_SECRET": {
       "rules": [
         { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "SYS_BOT_ADMIN" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
         { "principal": { "type": "role", "roleKey": "CLR_SECRET" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] }
@@ -99,6 +103,7 @@
     "POLICY_AUDIT_STAFF_ONLY": {
       "rules": [
         { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "SYS_BOT_ADMIN" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] },
         { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] },
         { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] }
       ]
