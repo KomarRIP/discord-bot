@@ -18,6 +18,15 @@
 - **Шаблон MVP**: `SSO_RF` (структура, роли, каналы, допуски).
 - **Права**: запрещаем по умолчанию; доступ выдаётся строго по ролям/допускам.
 
+### 0.3. Навигация по спецификациям
+
+`docs/core.md` остаётся единым «хабом», а детали MVP‑контрактов вынесены в `docs/specs/`:
+
+- `docs/specs/ports.md` — порты (Discord/Storage/Audit/Template)
+- `docs/specs/deployment.md` — идемпотентный деплой и fingerprint/diff
+- `docs/specs/permissions.md` — DSL политик прав и компиляция overwrites
+- `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
+
 ---
 
 ## 1. Глоссарий
