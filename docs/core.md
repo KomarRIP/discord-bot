@@ -27,6 +27,8 @@
 - `docs/specs/permissions.md` — DSL политик прав и компиляция overwrites
 - `docs/specs/rate-limit-and-retry.md` — очередь Discord API, retry/backoff, дедупликация create
 - `docs/specs/preview-and-diff.md` — формат preview/diff и safety warnings для подтверждения
+- `docs/specs/storage-schema-and-migrations.md` — схема данных и миграции (включая `deployment_steps`)
+- `docs/specs/repair-and-reconciliation.md` — diagnose/repair/adopt и reconciliation при рассинхронизации
 - `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
 
 ---

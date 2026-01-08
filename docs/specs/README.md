@@ -7,5 +7,7 @@
 - `permissions.md` — DSL политик прав и компиляция в Discord overwrites.
 - `rate-limit-and-retry.md` — очередь Discord API, retry/backoff, дедупликация create и StepJournal.
 - `preview-and-diff.md` — формат preview/diff деплоя, warnings и требования к отображению.
+- `storage-schema-and-migrations.md` — схема БД (включая `deployment_steps`) и правила миграций.
+- `repair-and-reconciliation.md` — сценарии восстановления: diagnose/repair/adopt, детектор дублей, reconciliation.
 - `template-sso-rf.md` — спецификация шаблона `SSO_RF` (MVP).
 
