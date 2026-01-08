@@ -9,5 +9,6 @@
 - `preview-and-diff.md` — формат preview/diff деплоя, warnings и требования к отображению.
 - `storage-schema-and-migrations.md` — схема БД (включая `deployment_steps`) и правила миграций.
 - `repair-and-reconciliation.md` — сценарии восстановления: diagnose/repair/adopt, детектор дублей, reconciliation.
+- `member-role-management.md` — управление ролями участника (rank/position/clearance) и авторизация команд.
 - `template-sso-rf.md` — спецификация шаблона `SSO_RF` (MVP).
 

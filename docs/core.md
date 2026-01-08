@@ -29,6 +29,7 @@
 - `docs/specs/preview-and-diff.md` — формат preview/diff и safety warnings для подтверждения
 - `docs/specs/storage-schema-and-migrations.md` — схема данных и миграции (включая `deployment_steps`)
 - `docs/specs/repair-and-reconciliation.md` — diagnose/repair/adopt и reconciliation при рассинхронизации
+- `docs/specs/member-role-management.md` — управление ролями участника и авторизация команд
 - `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
 
 ---
