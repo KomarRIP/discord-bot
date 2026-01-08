@@ -1,0 +1,486 @@
+import { ulid } from "ulid";
+import { sha256Fingerprint } from "../../shared/crypto/fingerprint.js";
+import { AppError } from "../../shared/errors/appError.js";
+import { managedChannelName, managedRoleName } from "../../infra/discord/managedNames.js";
+import { compilePolicy } from "../../infra/discord/permissionCompiler.js";
+export class TemplateDeploymentService {
+    deps;
+    constructor(deps) {
+        this.deps = deps;
+    }
+    async preview(ctx) {
+        const { template, configHash } = await this.loadInputs(ctx);
+        const plan = await this.buildPlan(ctx, template, configHash);
+        const warnings = await this.computeWarnings(ctx, template);
+        const summary = this.summarize(plan);
+        return {
+            type: "success",
+            title: "Deploy preview",
+            message: `template=${template.templateId}@${template.templateVersion}, schema=${template.schemaVersion}`,
+            data: {
+                templateId: template.templateId,
+                templateVersion: template.templateVersion,
+                schemaVersion: template.schemaVersion,
+                deploymentConfigHash: configHash,
+                summary,
+                warnings,
+                items: plan.map((p) => ({
+                    scope: p.scope,
+                    key: p.key,
+                    action: p.action,
+                    reason: p.reason,
+                    managedName: p.managedName,
+                })),
+            },
+        };
+    }
+    async apply(ctx) {
+        const { template, configHash } = await this.loadInputs(ctx);
+        const plan = await this.buildPlan(ctx, template, configHash);
+        const ownerId = await this.deps.discord.getGuildOwnerId(ctx.guildId);
+        const warnings = await this.computeWarnings(ctx, template);
+        const hasLockoutRisk = warnings.includes("RISK_LOCKOUT");
+        if (hasLockoutRisk && ctx.actorUserId !== ownerId) {
+            throw new AppError({
+                code: "SAFETY_LOCKOUT_RISK",
+                message: "Операция может заблокировать доступ владельцу. Применение разрешено только владельцу.",
+            });
+        }
+        const deploymentId = ulid();
+        const startedAt = new Date().toISOString();
+        this.deps.storage.guilds.beginDeployment({
+            deploymentId,
+            guildId: ctx.guildId,
+            templateId: template.templateId,
+            templateVersion: template.templateVersion,
+            schemaVersion: template.schemaVersion,
+            configHash,
+            actorUserId: ctx.actorUserId,
+            startedAt,
+        });
+        // План -> deployment_steps
+        for (const step of plan) {
+            this.deps.storage.deploymentSteps.insertPlanned({
+                stepId: ulid(),
+                deploymentId,
+                guildId: ctx.guildId,
+                seq: step.seq,
+                scope: step.scope,
+                kind: step.kind,
+                key: step.key,
+                fingerprint: step.fingerprint,
+                idempotencyKey: step.idempotencyKey,
+                action: step.action,
+                reason: step.reason,
+                plannedAt: startedAt,
+            });
+        }
+        const requestCtx = {
+            requestId: ctx.requestId,
+            actorUserId: ctx.actorUserId,
+            reason: `deploy=${deploymentId} requestId=${ctx.requestId}`,
+        };
+        try {
+            await this.executePlan(ctx, template, deploymentId, plan, requestCtx);
+            this.deps.storage.guilds.finishDeployment({
+                deploymentId,
+                status: "completed",
+                finishedAt: new Date().toISOString(),
+            });
+            this.deps.storage.guilds.upsertGuildState(ctx.guildId, {
+                activeTemplateId: template.templateId,
+                activeTemplateVersion: template.templateVersion,
+                activeSchemaVersion: template.schemaVersion,
+                deploymentConfigHash: configHash,
+                installedAt: startedAt,
+            });
+            return {
+                type: "success",
+                title: "Деплой завершён",
+                message: `deploymentId=${deploymentId}`,
+                data: { deploymentId },
+            };
+        }
+        catch (e) {
+            const err = e instanceof AppError ? e : new AppError({ code: "TRANSIENT_FAILURE", message: "Deploy failed", retryable: true, details: String(e) });
+            this.deps.storage.guilds.finishDeployment({
+                deploymentId,
+                status: "failed",
+                finishedAt: new Date().toISOString(),
+                errorCode: err.code,
+                errorJson: JSON.stringify({ message: err.message, details: err.details }),
+            });
+            throw err;
+        }
+    }
+    async loadInputs(ctx) {
+        const active = this.deps.storage.setupSessions.getActiveSession(ctx.guildId);
+        const templateId = active ? JSON.parse(active.answersJson).templateId ?? "SSO_RF" : "SSO_RF";
+        const template = await this.deps.templates.getTemplate(templateId);
+        const configHash = sha256Fingerprint({
+            templateId: template.templateId,
+            templateVersion: template.templateVersion,
+            schemaVersion: template.schemaVersion,
+            roles: template.roles,
+            channels: template.channels,
+            policies: template.policies,
+            // unitConfig (в MVP — из setup answers, но пока дефолт внутри setup)
+            unitConfig: active ? JSON.parse(active.answersJson) : null,
+        });
+        return { template, configHash };
+    }
+    roleFingerprint(spec, managedName) {
+        return sha256Fingerprint({
+            name: managedName,
+            color: spec.color ?? null,
+            hoist: spec.hoist ?? null,
+            mentionable: spec.mentionable ?? null,
+        });
+    }
+    channelFingerprint(spec, managedName) {
+        return sha256Fingerprint({
+            name: managedName,
+            type: spec.type,
+            topic: spec.topic ?? null,
+            parentKey: spec.parentKey ?? null,
+            policyKey: spec.policyKey,
+        });
+    }
+    overwritesFingerprint(template, policyKey) {
+        const policy = template.policies[policyKey];
+        return sha256Fingerprint({
+            policyKey,
+            rules: policy.rules.map((r) => ({
+                principal: r.principal,
+                effect: r.effect,
+                permissions: [...r.permissions].sort(),
+            })),
+        });
+    }
+    async buildPlan(ctx, template, configHash) {
+        const steps = [];
+        let seq = 1;
+        const deploymentIdForKey = `preview:${configHash.slice(0, 8)}`;
+        // roles
+        for (const role of template.roles) {
+            const managedName = managedRoleName(role.name, role.key);
+            const fp = this.roleFingerprint(role, managedName);
+            const mapping = this.deps.storage.mappings.getMapping(ctx.guildId, "role", role.key);
+            let action = "create";
+            let reason = "missing_mapping";
+            if (mapping) {
+                const exists = await this.deps.discord.getRoleById(ctx.guildId, mapping.discordId);
+                if (!exists) {
+                    action = "create";
+                    reason = "missing_in_discord";
+                }
+                else if (mapping.fingerprint !== fp) {
+                    action = "update";
+                    reason = "fingerprint_changed";
+                }
+                else {
+                    action = "skip";
+                    reason = "unchanged";
+                }
+            }
+            steps.push({
+                seq: seq++,
+                scope: "role",
+                kind: "RoleEnsure",
+                key: role.key,
+                fingerprint: fp,
+                idempotencyKey: `guild:${ctx.guildId}/deploy:${deploymentIdForKey}/RoleEnsure/${role.key}/${fp}`,
+                action,
+                reason,
+                managedName,
+                spec: role,
+            });
+        }
+        // categories and channels in declared order (SSO_RF is already safe)
+        const categories = template.channels.filter((c) => c.type === "category");
+        const channels = template.channels.filter((c) => c.type === "text");
+        for (const cat of categories) {
+            const managedName = managedChannelName(cat.name, cat.key, cat.type);
+            const fp = this.channelFingerprint(cat, managedName);
+            const mapping = this.deps.storage.mappings.getMapping(ctx.guildId, "category", cat.key);
+            let action = "create";
+            let reason = "missing_mapping";
+            if (mapping) {
+                const exists = await this.deps.discord.getChannelById(ctx.guildId, mapping.discordId);
+                if (!exists) {
+                    action = "create";
+                    reason = "missing_in_discord";
+                }
+                else if (mapping.fingerprint !== fp) {
+                    action = "update";
+                    reason = "fingerprint_changed";
+                }
+                else {
+                    action = "skip";
+                    reason = "unchanged";
+                }
+            }
+            steps.push({
+                seq: seq++,
+                scope: "category",
+                kind: "CategoryEnsure",
+                key: cat.key,
+                fingerprint: fp,
+                idempotencyKey: `guild:${ctx.guildId}/deploy:${deploymentIdForKey}/CategoryEnsure/${cat.key}/${fp}`,
+                action,
+                reason,
+                managedName,
+                spec: cat,
+            });
+            // overwrites for category (separate step)
+            const ofp = this.overwritesFingerprint(template, cat.policyKey);
+            steps.push({
+                seq: seq++,
+                scope: "overwrites",
+                kind: "OverwritesReplace",
+                key: cat.key,
+                fingerprint: ofp,
+                idempotencyKey: `guild:${ctx.guildId}/deploy:${deploymentIdForKey}/OverwritesReplace/${cat.key}/${ofp}`,
+                action: "update",
+                reason: "replace",
+                policyKey: cat.policyKey,
+            });
+        }
+        for (const ch of channels) {
+            const managedName = managedChannelName(ch.name, ch.key, ch.type);
+            const fp = this.channelFingerprint(ch, managedName);
+            const mapping = this.deps.storage.mappings.getMapping(ctx.guildId, "channel", ch.key);
+            let action = "create";
+            let reason = "missing_mapping";
+            if (mapping) {
+                const exists = await this.deps.discord.getChannelById(ctx.guildId, mapping.discordId);
+                if (!exists) {
+                    action = "create";
+                    reason = "missing_in_discord";
+                }
+                else if (mapping.fingerprint !== fp) {
+                    action = "update";
+                    reason = "fingerprint_changed";
+                }
+                else {
+                    action = "skip";
+                    reason = "unchanged";
+                }
+            }
+            steps.push({
+                seq: seq++,
+                scope: "channel",
+                kind: "ChannelEnsure",
+                key: ch.key,
+                fingerprint: fp,
+                idempotencyKey: `guild:${ctx.guildId}/deploy:${deploymentIdForKey}/ChannelEnsure/${ch.key}/${fp}`,
+                action,
+                reason,
+                managedName,
+                spec: ch,
+            });
+            const ofp = this.overwritesFingerprint(template, ch.policyKey);
+            steps.push({
+                seq: seq++,
+                scope: "overwrites",
+                kind: "OverwritesReplace",
+                key: ch.key,
+                fingerprint: ofp,
+                idempotencyKey: `guild:${ctx.guildId}/deploy:${deploymentIdForKey}/OverwritesReplace/${ch.key}/${ofp}`,
+                action: "update",
+                reason: "replace",
+                policyKey: ch.policyKey,
+            });
+        }
+        return steps;
+    }
+    summarize(plan) {
+        const init = () => ({ create: 0, update: 0, skip: 0 });
+        const out = {
+            roles: init(),
+            categories: init(),
+            channels: init(),
+            overwrites: init(),
+        };
+        for (const p of plan) {
+            const bucket = p.scope === "role"
+                ? out.roles
+                : p.scope === "category"
+                    ? out.categories
+                    : p.scope === "channel"
+                        ? out.channels
+                        : out.overwrites;
+            bucket[p.action] += 1;
+        }
+        return out;
+    }
+    async computeWarnings(ctx, template) {
+        // MVP: упрощённый safety check: audit policy не должна полностью исключать bot-admin роль
+        const warnings = [];
+        const auditChannel = template.channels.find((c) => c.key === "CH_AUDIT");
+        if (!auditChannel)
+            return warnings;
+        const policy = template.policies[auditChannel.policyKey];
+        const botAdminRoleKey = this.deps.botAdminRoleKey;
+        if (botAdminRoleKey) {
+            const hasAllow = policy.rules.some((r) => r.effect === "allow" && r.principal.type === "role" && r.principal.roleKey === botAdminRoleKey && r.permissions.includes("ViewChannel"));
+            if (!hasAllow)
+                warnings.push("RISK_LOCKOUT");
+        }
+        else {
+            warnings.push("RISK_LOCKOUT");
+        }
+        return warnings;
+    }
+    classifyDiscordError(e) {
+        // MVP: дискорд-ошибки маппим грубо, затем уточним по мере интеграции
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("Missing Permissions") || msg.includes("Missing Access")) {
+            return new AppError({ code: "FORBIDDEN", message: msg, retryable: false });
+        }
+        if (msg.includes("Unknown") || msg.includes("404")) {
+            return new AppError({ code: "NOT_FOUND", message: msg, retryable: false });
+        }
+        if (msg.includes("rate limit") || msg.includes("429")) {
+            return new AppError({ code: "RATE_LIMITED", message: msg, retryable: true });
+        }
+        return new AppError({ code: "TRANSIENT_FAILURE", message: msg, retryable: true });
+    }
+    async executePlan(ctx, template, deploymentId, plan, requestCtx) {
+        const deadlineAt = new Date(Date.now() + 10 * 60 * 1000);
+        const roleIdByKey = new Map();
+        const categoryIdByKey = new Map();
+        const channelIdByKey = new Map();
+        // 1) roles
+        for (const step of plan.filter((p) => p.scope === "role")) {
+            const role = step.spec;
+            const existing = this.deps.storage.mappings.getMapping(ctx.guildId, "role", role.key);
+            const res = await this.deps.queue.enqueue({
+                guildId: ctx.guildId,
+                kind: "RoleEnsure",
+                idempotencyKey: step.idempotencyKey,
+                budget: { deadlineAt, maxAttempts: 8 },
+                execute: async () => this.deps.discord.ensureRole({
+                    guildId: ctx.guildId,
+                    name: role.name,
+                    managedName: step.managedName,
+                    color: role.color,
+                    hoist: role.hoist,
+                    mentionable: role.mentionable,
+                    existingRoleId: existing?.discordId,
+                    ctx: requestCtx,
+                }),
+                classifyError: (e) => this.classifyDiscordError(e),
+            });
+            roleIdByKey.set(role.key, res.id);
+            this.deps.storage.mappings.upsertMapping({
+                guildId: ctx.guildId,
+                kind: "role",
+                key: role.key,
+                discordId: res.id,
+                fingerprint: step.fingerprint,
+                managedName: step.managedName,
+            });
+        }
+        // 2) categories
+        for (const step of plan.filter((p) => p.scope === "category")) {
+            const cat = step.spec;
+            const existing = this.deps.storage.mappings.getMapping(ctx.guildId, "category", cat.key);
+            const res = await this.deps.queue.enqueue({
+                guildId: ctx.guildId,
+                kind: "CategoryEnsure",
+                idempotencyKey: step.idempotencyKey,
+                budget: { deadlineAt, maxAttempts: 8 },
+                execute: async () => this.deps.discord.ensureCategory({
+                    guildId: ctx.guildId,
+                    name: cat.name,
+                    managedName: step.managedName,
+                    existingCategoryId: existing?.discordId,
+                    ctx: requestCtx,
+                }),
+                classifyError: (e) => this.classifyDiscordError(e),
+            });
+            categoryIdByKey.set(cat.key, res.id);
+            this.deps.storage.mappings.upsertMapping({
+                guildId: ctx.guildId,
+                kind: "category",
+                key: cat.key,
+                discordId: res.id,
+                fingerprint: step.fingerprint,
+                managedName: step.managedName,
+            });
+        }
+        // 3) channels
+        for (const step of plan.filter((p) => p.scope === "channel")) {
+            const ch = step.spec;
+            const existing = this.deps.storage.mappings.getMapping(ctx.guildId, "channel", ch.key);
+            const parentId = ch.parentKey ? categoryIdByKey.get(ch.parentKey) ?? this.deps.storage.mappings.getMapping(ctx.guildId, "category", ch.parentKey)?.discordId : undefined;
+            const res = await this.deps.queue.enqueue({
+                guildId: ctx.guildId,
+                kind: "ChannelEnsure",
+                idempotencyKey: step.idempotencyKey,
+                budget: { deadlineAt, maxAttempts: 8 },
+                execute: async () => this.deps.discord.ensureTextChannel({
+                    guildId: ctx.guildId,
+                    name: ch.name,
+                    managedName: step.managedName,
+                    topic: ch.topic,
+                    parentCategoryId: parentId,
+                    existingChannelId: existing?.discordId,
+                    ctx: requestCtx,
+                }),
+                classifyError: (e) => this.classifyDiscordError(e),
+            });
+            channelIdByKey.set(ch.key, res.id);
+            this.deps.storage.mappings.upsertMapping({
+                guildId: ctx.guildId,
+                kind: "channel",
+                key: ch.key,
+                discordId: res.id,
+                fingerprint: step.fingerprint,
+                managedName: step.managedName,
+            });
+        }
+        // 4) overwrites (categories then channels; plan already ordered)
+        const everyoneRoleId = await this.deps.discord.getEveryoneRoleId(ctx.guildId);
+        for (const step of plan.filter((p) => p.scope === "overwrites")) {
+            const key = step.key;
+            const targetId = categoryIdByKey.get(key) ??
+                channelIdByKey.get(key) ??
+                this.deps.storage.mappings.getMapping(ctx.guildId, "category", key)?.discordId ??
+                this.deps.storage.mappings.getMapping(ctx.guildId, "channel", key)?.discordId;
+            if (!targetId) {
+                throw new AppError({ code: "NOT_FOUND", message: `Target for overwrites not found: ${key}` });
+            }
+            const overwrites = compilePolicy({
+                guildEveryoneRoleId: everyoneRoleId,
+                template,
+                policyKey: step.policyKey,
+                roleIdByKey,
+            });
+            await this.deps.queue.enqueue({
+                guildId: ctx.guildId,
+                kind: "OverwritesReplace",
+                idempotencyKey: step.idempotencyKey,
+                budget: { deadlineAt, maxAttempts: 8 },
+                execute: async () => this.deps.discord.setPermissionOverwrites({
+                    guildId: ctx.guildId,
+                    targetChannelId: targetId,
+                    overwrites,
+                    ctx: requestCtx,
+                }),
+                classifyError: (e) => this.classifyDiscordError(e),
+            });
+        }
+        // MVP: messages/intake/cards — следующим шагом
+        this.deps.storage.audit.insert({
+            eventId: ulid(),
+            guildId: ctx.guildId,
+            deploymentId,
+            actorUserId: ctx.actorUserId,
+            type: "DeploymentCompleted",
+            payloadJson: JSON.stringify({ templateId: template.templateId, templateVersion: template.templateVersion }),
+            createdAt: new Date().toISOString(),
+        });
+    }
+}

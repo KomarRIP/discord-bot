@@ -1,0 +1,25 @@
+export function managedRoleName(displayName, roleKey) {
+    return `〚SSO〛 ${displayName} 〔${roleKey}〕`;
+}
+export function managedCategoryName(displayName, categoryKey) {
+    return `〚SSO〛 ${displayName} 〔${categoryKey}〕`;
+}
+function slugify(name) {
+    return name
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_]+/g, "-")
+        .replace(/[^\p{L}\p{N}-]+/gu, "")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+export function managedChannelName(name, channelKey, type) {
+    if (type === "category")
+        return managedCategoryName(name, channelKey);
+    // Discord channel names are limited; we keep a stable suffix for adoption.
+    const base = slugify(name);
+    const shortKey = channelKey.replace(/^CH_/, "").replace(/^CAT_/, "").toLowerCase();
+    const suffix = shortKey.slice(0, 12);
+    const combined = [base, suffix].filter(Boolean).join("-");
+    return combined.slice(0, 90); // safety margin under Discord limits
+}

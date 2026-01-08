@@ -1,0 +1,108 @@
+{
+  "templateId": "SSO_RF",
+  "schemaVersion": "1.0.0",
+  "templateVersion": "0.1.0",
+  "meta": {
+    "displayName": "ССО РФ (MVP)",
+    "language": "ru-RU"
+  },
+  "roles": [
+    { "key": "SYS_BOT_ADMIN", "type": "system", "name": "Админ бота" },
+    { "key": "BASE_GUEST", "type": "base", "name": "Гость" },
+    { "key": "BASE_MEMBER", "type": "base", "name": "Боец" },
+    { "key": "BASE_STAFF", "type": "base", "name": "Персонал" },
+    { "key": "BASE_COMMAND", "type": "base", "name": "Командование" },
+
+    { "key": "RANK_RYADOVOY", "type": "rank", "name": "Рядовой" },
+    { "key": "RANK_EFREITOR", "type": "rank", "name": "Ефрейтор" },
+    { "key": "RANK_ML_SERZHANT", "type": "rank", "name": "Мл. сержант" },
+    { "key": "RANK_SERZHANT", "type": "rank", "name": "Сержант" },
+    { "key": "RANK_STARSHINA", "type": "rank", "name": "Старшина" },
+    { "key": "RANK_LEITENANT", "type": "rank", "name": "Лейтенант" },
+    { "key": "RANK_ST_LEITENANT", "type": "rank", "name": "Ст. лейтенант" },
+    { "key": "RANK_KAPITAN", "type": "rank", "name": "Капитан" },
+
+    { "key": "POS_OTDEL_LEAD", "type": "position", "name": "Командир отделения" },
+    { "key": "POS_ZAM_OTDEL_LEAD", "type": "position", "name": "Зам. командира отделения" },
+    { "key": "POS_MEDIC", "type": "position", "name": "Медик" },
+    { "key": "POS_RTO", "type": "position", "name": "Связист" },
+    { "key": "POS_SAPPER", "type": "position", "name": "Сапёр" },
+    { "key": "POS_INSTRUCTOR", "type": "position", "name": "Инструктор" },
+
+    { "key": "CLR_DSP", "type": "clearance", "name": "ДСП" },
+    { "key": "CLR_SECRET", "type": "clearance", "name": "Секретно" }
+  ],
+  "channels": [
+    { "key": "CAT_PUBLIC", "type": "category", "name": "Общее", "policyKey": "POLICY_PUBLIC_READWRITE" },
+    { "key": "CH_RULES", "type": "text", "name": "правила", "parentKey": "CAT_PUBLIC", "policyKey": "POLICY_PUBLIC_READONLY" },
+    { "key": "CH_ANNOUNCE", "type": "text", "name": "объявления", "parentKey": "CAT_PUBLIC", "policyKey": "POLICY_PUBLIC_READONLY" },
+    { "key": "CH_GENERAL", "type": "text", "name": "общий-чат", "parentKey": "CAT_PUBLIC", "policyKey": "POLICY_PUBLIC_READWRITE" },
+
+    { "key": "CAT_INTAKE", "type": "category", "name": "Приёмная", "policyKey": "POLICY_INTAKE_PUBLIC" },
+    { "key": "CH_INTAKE", "type": "text", "name": "приёмная", "parentKey": "CAT_INTAKE", "policyKey": "POLICY_INTAKE_PUBLIC" },
+    { "key": "CH_INTAKE_QUEUE", "type": "text", "name": "очередь-заявок", "parentKey": "CAT_INTAKE", "policyKey": "POLICY_INTAKE_QUEUE_STAFF_ONLY" },
+
+    { "key": "CAT_MEMBER", "type": "category", "name": "Личный состав", "policyKey": "POLICY_MEMBER" },
+    { "key": "CH_BRIEFING", "type": "text", "name": "вводные", "parentKey": "CAT_MEMBER", "policyKey": "POLICY_MEMBER" },
+    { "key": "CH_ROSTER", "type": "text", "name": "состав", "parentKey": "CAT_MEMBER", "policyKey": "POLICY_MEMBER" },
+
+    { "key": "CAT_STAFF", "type": "category", "name": "Служебное", "policyKey": "POLICY_HQ_SECRET" },
+    { "key": "CH_HQ", "type": "text", "name": "штаб", "parentKey": "CAT_STAFF", "policyKey": "POLICY_HQ_SECRET" },
+    { "key": "CH_STAFF", "type": "text", "name": "персонал", "parentKey": "CAT_STAFF", "policyKey": "POLICY_HQ_SECRET" },
+
+    { "key": "CAT_LOGS", "type": "category", "name": "Журналы", "policyKey": "POLICY_AUDIT_STAFF_ONLY" },
+    { "key": "CH_AUDIT", "type": "text", "name": "аудит", "parentKey": "CAT_LOGS", "policyKey": "POLICY_AUDIT_STAFF_ONLY" }
+  ],
+  "policies": {
+    "POLICY_PUBLIC_READWRITE": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
+      ]
+    },
+    "POLICY_PUBLIC_READONLY": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] },
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["SendMessages"] }
+      ]
+    },
+    "POLICY_INTAKE_PUBLIC": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "BASE_GUEST" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
+      ]
+    },
+    "POLICY_INTAKE_QUEUE_STAFF_ONLY": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
+      ]
+    },
+    "POLICY_MEMBER": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "BASE_MEMBER" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] }
+      ]
+    },
+    "POLICY_HQ_SECRET": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory", "SendMessages"] },
+        { "principal": { "type": "role", "roleKey": "CLR_SECRET" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] }
+      ]
+    },
+    "POLICY_AUDIT_STAFF_ONLY": {
+      "rules": [
+        { "principal": { "type": "everyone" }, "effect": "deny", "permissions": ["ViewChannel"] },
+        { "principal": { "type": "role", "roleKey": "BASE_STAFF" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] },
+        { "principal": { "type": "role", "roleKey": "BASE_COMMAND" }, "effect": "allow", "permissions": ["ViewChannel", "ReadMessageHistory"] }
+      ]
+    }
+  }
+}
+
