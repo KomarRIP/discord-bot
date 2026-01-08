@@ -25,6 +25,8 @@
 - `docs/specs/ports.md` — порты (Discord/Storage/Audit/Template)
 - `docs/specs/deployment.md` — идемпотентный деплой и fingerprint/diff
 - `docs/specs/permissions.md` — DSL политик прав и компиляция overwrites
+- `docs/specs/rate-limit-and-retry.md` — очередь Discord API, retry/backoff, дедупликация create
+- `docs/specs/preview-and-diff.md` — формат preview/diff и safety warnings для подтверждения
 - `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
 
 ---
