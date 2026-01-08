@@ -10,5 +10,7 @@
 - `storage-schema-and-migrations.md` — схема БД (включая `deployment_steps`) и правила миграций.
 - `repair-and-reconciliation.md` — сценарии восстановления: diagnose/repair/adopt, детектор дублей, reconciliation.
 - `member-role-management.md` — управление ролями участника (rank/position/clearance) и авторизация команд.
+- `intake.md` — приёмная: заявки, очередь, авторизация, эффекты решений, аудит.
+- `discipline.md` — дисциплина: записи, severity, команды, аудит, отчётность.
 - `template-sso-rf.md` — спецификация шаблона `SSO_RF` (MVP).
 
