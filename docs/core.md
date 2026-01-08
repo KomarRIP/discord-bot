@@ -34,6 +34,8 @@
 - `docs/specs/discipline.md` — discipline: дисциплинарные записи, severity, отчётность
 - `docs/specs/discord-ui-and-errors.md` — интерфейсный слой Discord: UX паттерны, DTO, ошибки
 - `docs/specs/commands-mvp.md` — справочник команд MVP (контракт)
+- `docs/specs/runtime-configuration.md` — runtime env/config, feature flags и observability минимум
+- `docs/specs/discord-permissions-and-intents.md` — Discord intents/permissions и preflight проверка
 - `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
 
 ---

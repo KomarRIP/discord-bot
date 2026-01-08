@@ -14,5 +14,7 @@
 - `discipline.md` — дисциплина: записи, severity, команды, аудит, отчётность.
 - `discord-ui-and-errors.md` — UX‑паттерны интеракций, DTO и модель ошибок интерфейсного слоя.
 - `commands-mvp.md` — контракт справочника команд/интеракций MVP.
+- `runtime-configuration.md` — runtime env/config, режимы, feature flags, observability минимум.
+- `discord-permissions-and-intents.md` — требуемые Discord permissions/intents, безопасная установка, preflight.
 - `template-sso-rf.md` — спецификация шаблона `SSO_RF` (MVP).
 
