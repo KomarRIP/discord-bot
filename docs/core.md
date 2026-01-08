@@ -32,6 +32,8 @@
 - `docs/specs/member-role-management.md` — управление ролями участника и авторизация команд
 - `docs/specs/intake.md` — intake (приёмная): заявки, очередь, решения, аудит
 - `docs/specs/discipline.md` — discipline: дисциплинарные записи, severity, отчётность
+- `docs/specs/discord-ui-and-errors.md` — интерфейсный слой Discord: UX паттерны, DTO, ошибки
+- `docs/specs/commands-mvp.md` — справочник команд MVP (контракт)
 - `docs/specs/template-sso-rf.md` — шаблон `SSO_RF` (MVP) как конкретная спецификация
 
 ---
