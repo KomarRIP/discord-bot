@@ -173,8 +173,17 @@ export class TemplateDeploymentService {
 
   private async loadInputs(ctx: CommandContextDto): Promise<{ template: TemplateConfig; configHash: string }> {
     const active = this.deps.storage.setupSessions.getActiveSession(ctx.guildId);
-    const templateId =
-      active ? (JSON.parse(active.answersJson) as any).templateId ?? "SSO_RF" : "SSO_RF";
+    let templateId = "SSO_RF";
+    let unitConfig: unknown = null;
+    if (active) {
+      try {
+        const parsed = JSON.parse(active.answersJson) as Record<string, unknown>;
+        if (typeof parsed.templateId === "string") templateId = parsed.templateId;
+        unitConfig = parsed;
+      } catch {
+        unitConfig = null;
+      }
+    }
     const template = await this.deps.templates.getTemplate(templateId);
     const configHash = sha256Fingerprint({
       templateId: template.templateId,
@@ -184,7 +193,7 @@ export class TemplateDeploymentService {
       channels: template.channels,
       policies: template.policies,
       // unitConfig (в MVP — из setup answers, но пока дефолт внутри setup)
-      unitConfig: active ? JSON.parse(active.answersJson) : null,
+      unitConfig,
     });
     return { template, configHash };
   }
