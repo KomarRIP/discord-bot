@@ -82,12 +82,13 @@ export class DiscordGateway {
             return { channelId: ch.id, name: ch.name, type: "category", parentId: null };
         }
         if (ch.type === DjsChannelType.GuildText) {
+            const text = ch;
             return {
                 channelId: ch.id,
                 name: ch.name,
                 type: "text",
                 parentId: ch.parentId ?? null,
-                topic: ch.topic ?? null,
+                topic: text.topic ?? null,
             };
         }
         return null;
@@ -148,16 +149,17 @@ export class DiscordGateway {
                 message: `Adopted channel is not a text channel: ${ch.id}`,
             });
         }
+        const text = ch;
         const patch = {};
-        if (ch.name !== params.managedName)
+        if (text.name !== params.managedName)
             patch.name = params.managedName;
-        if (ch.topic !== (params.topic ?? null))
+        if (text.topic !== (params.topic ?? null))
             patch.topic = params.topic ?? null;
-        if (params.parentCategoryId !== undefined && ch.parentId !== params.parentCategoryId)
+        if (params.parentCategoryId !== undefined && text.parentId !== params.parentCategoryId)
             patch.parent = params.parentCategoryId;
         if (Object.keys(patch).length === 0)
             return { id: ch.id, changed: false };
-        const updated = await ch.edit({
+        const updated = await text.edit({
             ...patch,
             reason: params.ctx.reason ?? `requestId=${params.ctx.requestId}`,
         });
@@ -170,6 +172,9 @@ export class DiscordGateway {
             throw new AppError({ code: "NOT_FOUND", message: `Channel not found: ${params.targetChannelId}` });
         }
         // MVP: replace
+        if (!("permissionOverwrites" in ch)) {
+            throw new AppError({ code: "CONFLICT", message: `Channel does not support overwrites: ${params.targetChannelId}` });
+        }
         await ch.permissionOverwrites.set(params.overwrites, params.ctx.reason ?? `requestId=${params.ctx.requestId}`);
         return { changed: true };
     }
@@ -228,7 +233,12 @@ export class DiscordGateway {
         return null;
     }
     adoptChannelByName(guild, type, managedName) {
-        const matches = guild.channels.cache.filter((c) => c.type === type && c.name === managedName);
+        const matches = guild.channels.cache.filter((c) => {
+            if (c.type !== type)
+                return false;
+            const name = c.name;
+            return typeof name === "string" && name === managedName;
+        });
         if (matches.size === 1)
             return matches.first() ?? null;
         if (matches.size > 1) {

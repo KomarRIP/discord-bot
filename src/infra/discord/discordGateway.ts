@@ -125,12 +125,13 @@ export class DiscordGateway {
       return { channelId: ch.id, name: ch.name, type: "category", parentId: null };
     }
     if (ch.type === DjsChannelType.GuildText) {
+      const text = ch as TextChannel;
       return {
         channelId: ch.id,
         name: ch.name,
         type: "text",
         parentId: ch.parentId ?? null,
-        topic: (ch as any).topic ?? null,
+        topic: text.topic ?? null,
       };
     }
     return null;
@@ -216,15 +217,15 @@ export class DiscordGateway {
       });
     }
 
-    const patch: Record<string, unknown> = {};
-    if (ch.name !== params.managedName) patch.name = params.managedName;
-    if ((ch as any).topic !== (params.topic ?? null)) patch.topic = params.topic ?? null;
-    if (params.parentCategoryId !== undefined && ch.parentId !== params.parentCategoryId)
-      patch.parent = params.parentCategoryId;
+    const text = ch as TextChannel;
+    const patch: Partial<Parameters<TextChannel["edit"]>[0]> = {};
+    if (text.name !== params.managedName) patch.name = params.managedName;
+    if (text.topic !== (params.topic ?? null)) patch.topic = params.topic ?? null;
+    if (params.parentCategoryId !== undefined && text.parentId !== params.parentCategoryId) patch.parent = params.parentCategoryId;
 
     if (Object.keys(patch).length === 0) return { id: ch.id, changed: false };
-    const updated = await ch.edit({
-      ...(patch as any),
+    const updated = await text.edit({
+      ...patch,
       reason: params.ctx.reason ?? `requestId=${params.ctx.requestId}`,
     });
     return { id: updated.id, changed: true };
@@ -242,7 +243,10 @@ export class DiscordGateway {
       throw new AppError({ code: "NOT_FOUND", message: `Channel not found: ${params.targetChannelId}` });
     }
     // MVP: replace
-    await (ch as any).permissionOverwrites.set(params.overwrites, params.ctx.reason ?? `requestId=${params.ctx.requestId}`);
+    if (!("permissionOverwrites" in ch)) {
+      throw new AppError({ code: "CONFLICT", message: `Channel does not support overwrites: ${params.targetChannelId}` });
+    }
+    await ch.permissionOverwrites.set(params.overwrites, params.ctx.reason ?? `requestId=${params.ctx.requestId}`);
     return { changed: true };
   }
 
@@ -312,7 +316,11 @@ export class DiscordGateway {
   }
 
   private adoptChannelByName(guild: Guild, type: DjsChannelType, managedName: string): GuildBasedChannel | null {
-    const matches = guild.channels.cache.filter((c) => c.type === type && (c as any).name === managedName);
+    const matches = guild.channels.cache.filter((c) => {
+      if (c.type !== type) return false;
+      const name = (c as unknown as Record<string, unknown>).name;
+      return typeof name === "string" && name === managedName;
+    });
     if (matches.size === 1) return matches.first() ?? null;
     if (matches.size > 1) {
       throw new AppError({
