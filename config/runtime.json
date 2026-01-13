@@ -1,0 +1,15 @@
+{
+  "templatesPath": "../templates",
+  "defaultLocale": "ru-RU",
+  "botAdminRoleKey": "SYS_BOT_ADMIN",
+  "rateLimit": {
+    "maxGuildConcurrency": 1,
+    "maxGlobalConcurrency": 3,
+    "operationDeadlineSeconds": 600
+  },
+  "features": {
+    "enablePrune": false,
+    "enableDMNotifications": false
+  }
+}
+

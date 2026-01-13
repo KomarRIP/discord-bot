@@ -1,0 +1,45 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Этот репозиторий содержит **архитектурное ядро** проекта: доменную модель, границы модулей, схемы конфигов и дорожную карту. Цель продукта — после приглашения бота в пустой Discord‑сервер провести **Setup Wizard** и автоматически развернуть полностью готовую структуру: роли, каналы, права, приёмную/пропускной режим, журналы и правила.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KomarRIP/discord-bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KomarRIP/discord-bot/issues"
+  },
+  "homepage": "https://github.com/KomarRIP/discord-bot#readme",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.3",
+    "pino": "^10.1.0",
+    "ulid": "^3.0.2",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.3",
+    "eslint": "^9.39.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.52.0"
+  }
+}
